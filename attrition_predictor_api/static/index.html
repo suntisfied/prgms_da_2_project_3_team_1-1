@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attrition Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 2rem;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 1rem;
+            overflow-x: scroll;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        .recommendations {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Attrition Predictor</h1>
+        <h2>Upload Dataset</h2>
+        <form id="train-form">
+            <div class="form-group">
+                <label for="dataset">Upload Dataset (CSV):</label>
+                <input type="file" id="dataset" accept=".csv">
+            </div>
+            <div class="form-group">
+                <label for="label">Label Column:</label>
+                <input type="text" id="label" value="left">
+            </div>
+            <button type="submit">Train Model</button>
+        </form>
+
+        <h2>Feature Importance Graph (Attrition)</h2>
+        <img id="feature-graph-class" src="" alt="Feature Importance Graph (Classification)">
+
+        <h2>Model Evaluation Metrics</h2>
+        <pre id="metrics"></pre>
+
+        <h2>Predict Employee Attrition</h2>
+        <form id="predict-form">
+            <div class="form-group">
+                <label for="satisfaction-level">Satisfaction Level (0 - 1):</label>
+                <input type="number" id="satisfaction-level" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="time-spend-company">Job Tenure (years):</label>
+                <input type="number" id="time-spend-company" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="number-project">Number of Projects:</label>
+                <input type="number" id="number-project" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="average-monthly-hours">Average Monthly Hours:</label>
+                <input type="number" id="average-monthly-hours" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="salary">Salary:</label>
+                <select id="salary" required>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <button type="submit">Predict</button>
+        </form>
+        <h3>Prediction Result</h3>
+        <pre id="prediction-result"></pre>
+
+        <h2>Feature Importance Graph (Satisfaction)</h2>
+        <img id="feature-graph-reg" src="" alt="Feature Importance Graph (Regression)">
+
+        <h2>Attrition Rate by Number of Projects</h2>
+        <img id="leave-rate-by-projects" src="" alt="Leave Rate by Number of Projects">
+
+        <div class="recommendations">
+            <h2>Recommendations</h2>
+            <p id="recommendations-text">Please provide input data and submit a prediction to see recommendations.</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById("train-form").onsubmit = async (event) => {
+            event.preventDefault();
+            const dataset = document.getElementById("dataset").files[0];
+            const label = document.getElementById("label").value;
+            const formData = new FormData();
+            formData.append("file", dataset);
+            formData.append("label", label);
+
+            const response = await fetch("/train/", {
+                method: "POST",
+                body: formData
+            });
+
+            const result = await response.json();
+            document.getElementById("feature-graph-class").src = result.classification_graph_url;
+            document.getElementById("feature-graph-reg").src = result.regression_graph_url;
+            document.getElementById("leave-rate-by-projects").src = result.leave_rate_by_projects_url;
+            document.getElementById("metrics").textContent = `Model Status: ${result.message}\nAccuracy: ${result.accuracy.toFixed(2)}\nF1 Score: ${result.f1_score.toFixed(2)}`;
+        };
+
+        document.getElementById("predict-form").onsubmit = async (event) => {
+            event.preventDefault();
+            const satisfactionLevel = parseFloat(document.getElementById("satisfaction-level").value);
+            const timeSpendCompany = parseFloat(document.getElementById("time-spend-company").value);
+            const numberProject = parseFloat(document.getElementById("number-project").value);
+            const averageMonthlyHours = parseFloat(document.getElementById("average-monthly-hours").value);
+            const salary = document.getElementById("salary").value;
+
+            const predictionRequest = {
+                satisfaction_level: satisfactionLevel,
+                time_spend_company: timeSpendCompany,
+                number_project: numberProject,
+                average_montly_hours: averageMonthlyHours,
+                salary: salary
+            };
+
+            const response = await fetch("/predict/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(predictionRequest)
+            });
+
+            const result = await response.json();
+            const quit = result.prediction ? "Yes" : "No";
+            document.getElementById("prediction-result").textContent = `Quit?: ${quit}\nProbability: ${(result.probability).toFixed(2)}%`;
+
+            // Update recommendations based on the prediction result
+            document.getElementById("recommendations-text").textContent = result.recommendations;
+        };
+    </script>
+</body>
+</html>
